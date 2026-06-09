@@ -1,59 +1,84 @@
-# PasswordManagerFrontend
+# PasswordManager — Frontend
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.0.3.
+Angular 20 single-page application for the password vault. All API calls go through the ApiGateway.
 
-## Development server
+## Stack
 
-To start a local development server, run:
+- **Angular 20** — standalone components, zoneless change detection
+- **Signals** — reactive state (`signal`, `computed`)
+- **Reactive Forms** — login, register, password form
+- **HttpClient** + functional interceptor — automatic JWT injection and token refresh
+
+## Features
+
+- Register / login / logout
+- Session restored on page reload via refresh token
+- List, search, create, edit, delete password entries
+- Reveal / hide stored passwords
+- One-click copy to clipboard
+- Built-in password generator (cryptographically random, 20 chars)
+- Favorite flag and category label per entry
+- Dark theme
+
+## Project structure
+
+```
+src/
+├── environments/
+│   ├── environment.ts          ← dev (apiUrl: http://localhost:5248)
+│   └── environment.prod.ts     ← prod (apiUrl: https://your-gateway-domain.com)
+└── app/
+    ├── core/
+    │   ├── services/
+    │   │   ├── auth.service.ts     ← login, register, logout, refresh, session restore
+    │   │   └── vault.service.ts    ← CRUD for password entries
+    │   ├── interceptors/
+    │   │   └── auth.interceptor.ts ← injects Bearer token, retries on 401
+    │   └── guards/
+    │       └── auth.guard.ts       ← redirects to /login if unauthenticated
+    ├── features/
+    │   ├── auth/
+    │   │   ├── login/
+    │   │   └── register/
+    │   └── vault/
+    │       ├── vault.component.*       ← main vault view
+    │       └── password-form/          ← create / edit modal
+    ├── app.routes.ts      ← lazy-loaded routes with auth guard
+    ├── app.config.ts      ← providers: router, HttpClient, interceptor, APP_INITIALIZER
+    └── app.html
+```
+
+## Authentication flow
+
+1. **Login** → access token stored in memory (`signal`), refresh token in `localStorage`
+2. **Page reload** → `APP_INITIALIZER` calls `/auth/refresh`, restores access token silently
+3. **401 response** → interceptor auto-retries after a token refresh, logs out on failure
+4. **Logout** → revokes refresh token server-side, clears `localStorage`
+
+The access token is intentionally kept in memory only (never `localStorage`) to reduce XSS exposure.
+
+## Running locally
 
 ```bash
+npm install
 ng serve
+# Open http://localhost:4200
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+The app expects the ApiGateway at `http://localhost:5248` (see `environment.ts`).
 
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
+## Production build
 
 ```bash
 ng build
+# Output: dist/PasswordManager-frontend/
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+The production build uses `environment.prod.ts`. Update `apiUrl` there before building:
 
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
-
-```bash
-ng test
+```typescript
+export const environment = {
+  production: true,
+  apiUrl: 'https://your-gateway-domain.com',
+};
 ```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.

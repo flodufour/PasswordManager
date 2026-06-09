@@ -1,0 +1,73 @@
+<div class="vault-page">
+  <header class="vault-header">
+    <div class="vault-title">
+      <span>🔐</span>
+      <h1>My Vault</h1>
+    </div>
+    <div class="vault-actions">
+      <button class="btn-add" (click)="openCreate()">+ Add password</button>
+      <button class="btn-logout" (click)="logout()">Sign out</button>
+    </div>
+  </header>
+
+  <div class="search-bar">
+    <input
+      type="search"
+      placeholder="Search by title, username or URL…"
+      [value]="search()"
+      (input)="search.set($any($event.target).value)"
+    />
+  </div>
+
+  @if (loading()) {
+    <div class="state-message">Loading…</div>
+  } @else if (filtered().length === 0) {
+    <div class="state-message">
+      {{ search() ? 'No results.' : 'Your vault is empty. Add your first password!' }}
+    </div>
+  } @else {
+    <div class="entry-grid">
+      @for (entry of filtered(); track entry.id) {
+        <div class="entry-card" [class.favorite]="entry.isFavorite">
+          <div class="entry-main">
+            <div class="entry-title">{{ entry.title }}</div>
+            <div class="entry-username">{{ entry.username }}</div>
+            @if (entry.url) {
+              <a class="entry-url" [href]="entry.url" target="_blank" rel="noopener">
+                {{ entry.url }}
+              </a>
+            }
+            @if (entry.category) {
+              <span class="entry-badge">{{ entry.category }}</span>
+            }
+          </div>
+
+          <div class="entry-password-row">
+            <span class="password-value">
+              {{ isRevealed(entry.id) ? entry.password : '••••••••' }}
+            </span>
+            <button class="icon-btn" (click)="toggleReveal(entry.id)" title="Reveal">
+              {{ isRevealed(entry.id) ? '🙈' : '👁️' }}
+            </button>
+            <button class="icon-btn" (click)="copyToClipboard(entry.password)" title="Copy">
+              📋
+            </button>
+          </div>
+
+          <div class="entry-footer">
+            <button class="btn-edit" (click)="openEdit(entry)">Edit</button>
+            <button class="btn-delete" (click)="delete(entry)">Delete</button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+@if (showForm()) {
+  <app-password-form
+    [entry]="editEntry()"
+    (saved)="onSaved()"
+    (cancelled)="closeForm()"
+  />
+}

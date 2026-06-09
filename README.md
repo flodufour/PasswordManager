@@ -1,58 +1,67 @@
 # Password Manager
 
-Simple password manager application with Angular frontend and ASP.NET Core backend using a separated authentication service.
+A simple, secure password vault built on a microservice architecture.
 
 ## Architecture
 
-The system is split into multiple services:
+```
+Browser (Angular)
+    │
+    ▼
+ApiGateway  :5248       ← single entry point, JWT validation, rate limiting
+    │
+    ├── /auth/**  ──►  AuthService        :5121  (registration, login, tokens)
+    └── /passwords/**  ►  PasswordManager  :5120  (vault CRUD, AES-256-GCM)
+```
 
-- AuthService (ASP.NET Core): handles authentication, JWT issuance, refresh tokens, email verification and password reset
-- PasswordManager API (ASP.NET Core): manages user password vault (CRUD operations)
-- Frontend (Angular): user interface for authentication and password management
+- The gateway is the **only** public endpoint. Downstream services are never exposed directly.
+- JWT is validated once at the gateway. The vault service receives a trusted `X-User-Id` header — it never sees or parses a token.
+- Passwords are encrypted at rest with AES-256-GCM using a server-side master key.
 
-## Features
+## Services
 
-- User registration and login
-- JWT-based authentication
-- Refresh token session management
-- Secure access to password vault
-- Create, read, update and delete stored credentials
-- User-specific data isolation
+| Service | Tech | Port | README |
+|---|---|---|---|
+| ApiGateway | ASP.NET Core 9 + YARP | 5248 | `ApiGateway/` |
+| AuthService | ASP.NET Core 9 | 5121 | `AuthService/` |
+| PasswordManager (API) | ASP.NET Core 9 + EF Core + MySQL | 5120 | `PasswordManager-backend/` |
+| PasswordManager (UI) | Angular 20 | 4200 | `PasswordManager-frontend/` |
 
-## Backend
+## Running locally
 
-- ASP.NET Core Web API
-- Entity Framework Core
-- MySQL database
-- JWT authentication middleware
-- BCrypt password hashing (AuthService)
+Start each service in order:
 
-## Frontend
+```bash
+# 1. AuthService
+cd AuthService/src && dotnet run
 
-- Angular
-- AuthService for authentication handling
-- HTTP Interceptors for JWT injection
-- Route guards for protected pages
-- Vault service for password management API calls
+# 2. PasswordManager backend
+cd PasswordManager-backend && dotnet run
 
-## Security
+# 3. ApiGateway
+cd ApiGateway/src && dotnet run
 
-- JWT authentication for API access
-- Refresh token rotation
-- Password hashing with BCrypt
-- User-based data access control
+# 4. Frontend
+cd PasswordManager-frontend && ng serve
+```
 
-## API Overview (Password Manager)
+Open `http://localhost:4200`.
 
-- GET /passwords
-- POST /passwords
-- PUT /passwords/{id}
-- DELETE /passwords/{id}
+## Security overview
 
-All endpoints require valid JWT authentication.
+| Concern | Solution |
+|---|---|
+| Authentication | JWT RS256 issued by AuthService, validated by gateway via JWKS |
+| Password storage | AES-256-GCM, key derived from `Encryption:MasterKey` |
+| Identity forgery | Gateway strips `X-User-Id` / `X-User-Email` on every inbound request |
+| Session | Short-lived access token (memory) + rotating refresh token (localStorage) |
+| Rate limiting | 300 req/min per IP at the gateway |
 
-## Notes
+## Production checklist
 
-- AuthService is fully separated from the password manager service
-- Password Manager API does not handle authentication logic
-- Communication is done via JWT tokens issued by AuthService
+- [ ] Set `Encryption__MasterKey` as an environment variable (never in a committed file)
+- [ ] Set `ConnectionStrings__DefaultConnection` as an environment variable
+- [ ] Update `Auth__Authority` to the production AuthService HTTPS URL
+- [ ] Set `Cors__AllowedOrigins__0` to the production frontend domain
+- [ ] Replace `apiUrl` in `environment.prod.ts` with the production gateway URL
+- [ ] Enforce HTTPS on all services
